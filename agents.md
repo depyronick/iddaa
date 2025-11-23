@@ -1,10 +1,11 @@
 ## Task Tracker
 - Goal: build full, well-typed models for all sportsbook/statistics endpoints, then map meanings using frontend usage to return meaningful objects to the backend.
 - Current focus: enumerate keys from each endpoint, lock down shapes, then clarify semantics from UI code.
-- Compact note: context retained as of this entry; matches-v2 route added with descriptive payload; types updated; outstanding lint only on `src/app/page.tsx`. Next phase: extract field meanings from frontend chunks/URLs to replace inferred comments.
+- Compact note: context retained as of this entry; `/api/matches` now serves the v2 payload directly and the old v1 UI/routes are removed. Types updated; next phase: extract field meanings from frontend chunks/URLs to replace inferred comments.
 
 ### Progress
 - `get_market_config`: keys confirmed from live payload. Required fields on entries (`i,n,il,mt,mmdv,mmlv,p,st,mst,mdv,mlv`) with optional `d,o,sn,so,in`. Maps present: `m`, `mg`, `msg`, `dmg`, `dmsg`, `s` (all populated). Group keys: `i,n,p,st,sg,im,iv`; subgroup keys: `i,n,p,mg,m,im,iv,il` (+ optional `h`); sport keys: `i,n,p,ic,ics,icc,sl`. Types updated in `src/types/match.ts` and wired in `src/lib/services/matches.ts` with generic `fetchJson`.
+- Frontend now points to the v2 live matches UI (root route re-exports it) and `/api/matches` aliases the v2 payload; v1 UI removed.
 - Helpers adjusted to use `mst`/name for 1X2 detection (experiments engine/base) instead of the old `m` guess.
 - `events?st=1&type=1&version=0`: top keys `isSuccess,data,message`; `data` has `isdiff,version,events,sc,rmi`. Event keys seen: `i,bri,v,hn,an,sid,s,bp,il,m,ci,oc,d,hc,mbc,kOdd,kMbc,mpi` (and sometimes `kLive`/`hduel` per older code). Markets in this feed carry `i,t,st,v,s,mbc,sov?,o`; outcomes carry `no,n,odd,wodd`. Score map `sc` entries use keys `sid,id,t,s,ht,at,min,sec` (matches EventScore).
 - `event/{id}?allMarkets=true`: query param `allMarkets=true` (no change in keys vs default); data keys match events feed plus `sc` embedded. Markets same shape as events feed (`i,t,st,v,s,mbc,sov?,o`), outcomes `no,n,odd,wodd`. `sc` object has `sid,id,t,s,ht,at,min` (ht/at with `r,c` seen).
@@ -53,4 +54,4 @@ For each endpoint: capture query params (ids, sportType, pagination, flags), res
 ### Open items / next steps
 - Pull fresh samples from each endpoint above, list all keys, and tighten TypeScript interfaces in `src/types/match.ts`.
 - For each field, cross-check frontend usage to infer real meaning; annotate and replace placeholder comments/unknowns (upcoming: scrape/inspect frontend chunk URLs for semantics).
-- After shapes are finalized, return more meaningful mapped objects from the backend (reduce `unknown`/`any` in consumers). A new `matches-v2` route already outputs a descriptive payload; ensure consumers migrate once meanings are clarified.
+- After shapes are finalized, return more meaningful mapped objects from the backend (reduce `unknown`/`any` in consumers). Consumer paths now use `/api/matches` (v2 payload) only.

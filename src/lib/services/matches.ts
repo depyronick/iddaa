@@ -16,11 +16,17 @@ type DataResponse<T> = {
   [key: string]: unknown;
 };
 
+type CacheEntry<T> = {
+  value: T;
+  expires: number;
+};
+
 const emptyPromise = Promise.resolve(null);
 
 export class MatchesService {
   private sportradarToken: string | null = null;
   private tokenExpiry = 0;
+  private cache = new Map<string, CacheEntry<unknown>>();
 
   private generateUUID() {
     return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
@@ -47,10 +53,23 @@ export class MatchesService {
     };
   }
 
-  private async fetchJson<T>(url: string): Promise<T | null> {
+  private async fetchJson<T>(url: string, ttlMs?: number): Promise<T | null> {
+    if (ttlMs && ttlMs > 0) {
+      const cached = this.cache.get(url) as CacheEntry<T> | undefined;
+      if (cached && cached.expires > Date.now()) {
+        return cached.value;
+      }
+    }
+
     const res = await fetch(url, { headers: this.makeHeaders() });
     if (!res.ok) return null;
-    return (await res.json()) as T;
+    const json = (await res.json()) as T;
+
+    if (ttlMs && ttlMs > 0) {
+      this.cache.set(url, { value: json, expires: Date.now() + ttlMs });
+    }
+
+    return json;
   }
 
   private getEventId(event: MatchEvent | { id?: number | string }): string {
@@ -127,7 +146,8 @@ export class MatchesService {
       searchParams.get("includeUpcoming") === "true";
 
     const marketConfigPromise = this.fetchJson<MarketConfigResponse>(
-      "https://sportsbookv2.iddaa.com/sportsbook/get_market_config"
+      "https://sportsbookv2.iddaa.com/sportsbook/get_market_config",
+      10 * 60 * 1000 // cache for 10 minutes
     );
     const [
       matchesData,
@@ -140,13 +160,16 @@ export class MatchesService {
         "https://sportsbookv2.iddaa.com/sportsbook/events?st=1&type=1&version=0"
       ),
       this.fetchJson<CompetitionsResponse>(
-        "https://sportsbookv2.iddaa.com/sportsbook/competitions"
+        "https://sportsbookv2.iddaa.com/sportsbook/competitions",
+        60 * 60 * 1000 // cache for 1 hour
       ),
       this.fetchJson<OutcomePlayPercentagesResponse>(
-        "https://sportsbookv2.iddaa.com/sportsbook/outcome-play-percentages?sportType=1"
+        "https://sportsbookv2.iddaa.com/sportsbook/outcome-play-percentages?sportType=1",
+        30 * 1000 // cache for 30 seconds
       ),
       this.fetchJson<PlayedEventPercentageResponse>(
-        "https://sportsbookv2.iddaa.com/sportsbook/played-event-percentage?sportType=1"
+        "https://sportsbookv2.iddaa.com/sportsbook/played-event-percentage?sportType=1",
+        30 * 1000 // cache for 30 seconds
       ),
       marketConfigPromise,
     ]);

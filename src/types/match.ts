@@ -820,7 +820,7 @@ export interface MatchEvent {
   [key: string]: unknown;
 }
 
-/** Consolidated response returned by /api/matches. */
+/** Consolidated response returned by /api/matches (v2 payload). */
 export interface MatchesApiResponse {
   /** Filtered/enriched event list. */
   data: MatchEvent[];
