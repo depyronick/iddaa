@@ -402,7 +402,6 @@ export default function LiveMatchesPage() {
     const fetchMatches = async () => {
       try {
         setState("loading");
-        const auth = typeof window !== "undefined" ? window.btoa("depyronick:xpt5Tpx2+") : "";
         const params = new URLSearchParams();
         if (viewMode === "live") {
           params.set("status", "live");
@@ -414,7 +413,6 @@ export default function LiveMatchesPage() {
         const url = `/api/matches${params.size ? `?${params.toString()}` : ""}`;
         const res = await fetch(url, {
           cache: "no-store",
-          headers: auth ? { Authorization: `Basic ${auth}` } : undefined,
         });
         if (!res.ok) throw new Error(res.statusText);
         const json = (await res.json()) as MatchesResponse;
