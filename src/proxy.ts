@@ -1,6 +1,7 @@
+import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
-export function proxy(request: Request) {
+export default function proxy(request: NextRequest) {
   const username = process.env.BASIC_AUTH_USER;
   const password = process.env.BASIC_AUTH_PASS;
 
