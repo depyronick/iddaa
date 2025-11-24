@@ -313,6 +313,7 @@ export default function LiveMatchesPage() {
   const [showTopBets, setShowTopBets] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const controllerRef = useRef<AbortController | null>(null);
   const selectedIdRef = useRef<string | number | null>(null);
 
   useEffect(() => {
@@ -369,6 +370,7 @@ export default function LiveMatchesPage() {
     setError(null);
     setState("loading");
     setShowTopBets(false);
+    controllerRef.current?.abort();
   };
 
   const topBetPercentages = useMemo(() => {
@@ -413,6 +415,8 @@ export default function LiveMatchesPage() {
 
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
+    const controller = new AbortController();
+    controllerRef.current = controller;
 
     const fetchMatches = async () => {
       try {
@@ -428,6 +432,7 @@ export default function LiveMatchesPage() {
         const url = `/api/matches${params.size ? `?${params.toString()}` : ""}`;
         const res = await fetch(url, {
           cache: "no-store",
+          signal: controller.signal,
         });
         if (!res.ok) throw new Error(res.statusText);
         const json = (await res.json()) as MatchesResponse;
@@ -439,6 +444,9 @@ export default function LiveMatchesPage() {
         setHasLoadedOnce(true);
         setState("idle");
       } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+          return;
+        }
         const message = err instanceof Error ? err.message : "Fetch failed";
         setError(message);
         setState("error");
@@ -449,6 +457,7 @@ export default function LiveMatchesPage() {
     timer = setInterval(fetchMatches, POLL_MS);
     return () => {
       if (timer) clearInterval(timer);
+      controller.abort();
     };
   }, [viewMode]);
 
@@ -474,29 +483,31 @@ export default function LiveMatchesPage() {
             >
               {isSidebarOpen ? "Kapat" : "Menü"}
             </Button>
-            <h1 className="text-2xl font-bold">Canlı Maçlar</h1>
-            {isLoading && (
-              <div
-                className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-primary/70 border-t-transparent align-middle"
-                aria-label="Yükleniyor"
-              >
-                <span className="sr-only">Yükleniyor</span>
-              </div>
-            )}
+            <div className="relative flex items-center">
+              <h1 className="text-lg lg:text-xl font-bold text-foreground">Canlı</h1>
+              {isLoading && (
+                <span
+                  className="absolute -right-3 top-1 h-2 w-2 rounded-full bg-primary animate-pulse"
+                  aria-label="Yükleniyor"
+                />
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="secondary" className="gap-1.5 px-3 py-1 text-xs">
               <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
               {matches.length} maç • {Math.round(POLL_MS / 1000)}s
             </Badge>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowTopBets(true)}
-              className="h-8 px-2 text-xs"
-            >
-              Top 10
-            </Button>
+            {viewMode === "prematch" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowTopBets(true)}
+                className="h-8 px-2 text-xs"
+              >
+                Top 10
+              </Button>
+            )}
           </div>
         </div>
       </div>
