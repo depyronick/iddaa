@@ -481,7 +481,28 @@ export default function LiveMatchesPage() {
               className="h-9 px-2 text-xs lg:hidden"
               onClick={() => setIsSidebarOpen((prev) => !prev)}
             >
-              {isSidebarOpen ? "Kapat" : "Menü"}
+              <span className="sr-only">Menü</span>
+              <span
+                aria-hidden="true"
+                className="relative block h-4 w-5"
+              >
+                <span
+                  className={`absolute left-0 h-0.5 w-full rounded bg-foreground transition-transform ${
+                    isSidebarOpen ? "translate-y-1.5 rotate-45" : "translate-y-0"
+                  }`}
+                />
+                <span
+                  className={`absolute left-0 h-0.5 w-full rounded bg-foreground transition-opacity ${
+                    isSidebarOpen ? "opacity-0" : "opacity-100"
+                  }`}
+                  style={{ top: "7px" }}
+                />
+                <span
+                  className={`absolute left-0 h-0.5 w-full rounded bg-foreground transition-transform ${
+                    isSidebarOpen ? "translate-y-1.5 -rotate-45" : "translate-y-3"
+                  }`}
+                />
+              </span>
             </Button>
             <div className="relative flex items-center">
               <h1 className="text-lg lg:text-xl font-bold text-foreground">Canlı</h1>
