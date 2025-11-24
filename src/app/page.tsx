@@ -221,13 +221,28 @@ function formatMarketLabel(market: Market) {
     market.name ||
     (market.id !== undefined ? `Piyasa ${market.id}` : "Piyasa");
   const line = market.line ?? null;
-  if (base.includes("{0}")) {
-    return base.replace("{0}", line !== null && line !== undefined ? String(line) : "");
+  const lineStr = line !== null && line !== undefined ? String(line) : "";
+  const parts = lineStr ? lineStr.split(/[-/_]/).filter(Boolean) : [];
+  const primary = parts[0] ?? lineStr;
+  const secondary = parts[1];
+
+  let label = base;
+  if (base.includes("{0}") || base.includes("{h}") || base.includes("{1}")) {
+    if (primary) {
+      label = label.replace(/\{0\}/g, primary).replace(/\{h\}/g, primary);
+    }
+    if (secondary) {
+      label = label.replace(/\{1\}/g, secondary);
+    } else if (primary) {
+      label = label.replace(/\{1\}/g, primary);
+    }
+    // Strip any unreplaced placeholders and tidy spacing.
+    label = label.replace(/\{[^}]*\}/g, "").replace(/\s{2,}/g, " ").trim();
+  } else if (lineStr) {
+    label = `${base} (${lineStr})`;
   }
-  if (line !== null && line !== undefined && line !== "") {
-    return `${base} (${line})`;
-  }
-  return base;
+
+  return label;
 }
 
 // Match List Item Component
@@ -724,8 +739,9 @@ export default function LiveMatchesPage() {
                     {(() => {
                       const match = selectedMatch;
                       const eventInfo = match.statistics?.eventInformationModel;
-                      const homeScore = eventInfo?.score?.home ?? 0;
-                      const awayScore = eventInfo?.score?.away ?? 0;
+                      const liveScore = match.sc;
+                      const homeScore = liveScore?.ht?.r ?? eventInfo?.score?.home ?? 0;
+                      const awayScore = liveScore?.at?.r ?? eventInfo?.score?.away ?? 0;
 
                       const homeTeamLogo = constructLogoUrl(eventInfo?.homeTeam?.logo);
                       const awayTeamLogo = constructLogoUrl(eventInfo?.awayTeam?.logo);

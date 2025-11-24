@@ -9,6 +9,7 @@ import type {
   EventDetailResponse,
   EventsResponse,
   StandingRow,
+  EventsScoreMap,
 } from "@/types/match";
 
 type DataResponse<T> = {
@@ -210,7 +211,14 @@ export class MatchesService {
       storeConfig(config);
     });
 
+    const scoreMap = (matchesData?.data?.sc || {}) as EventsScoreMap;
     const allEvents: MatchEvent[] = (matchesData?.data?.events || []) as MatchEvent[];
+    allEvents.forEach((ev) => {
+      const key = ev?.i ? String(ev.i) : undefined;
+      if (key && !ev.sc && scoreMap[key]) {
+        ev.sc = scoreMap[key];
+      }
+    });
     const events = allEvents.filter((ev) => {
       const status = ev.s ?? 0;
       if (includeUpcoming && status === 0) return true;
