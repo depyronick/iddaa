@@ -296,11 +296,30 @@ export default function LiveMatchesPage() {
   const [viewMode, setViewMode] = useState<ViewMode>("live");
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [showTopBets, setShowTopBets] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const selectedIdRef = useRef<string | number | null>(null);
 
   useEffect(() => {
     selectedIdRef.current = selectedId;
   }, [selectedId]);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1024px)");
+    const update = (e: MediaQueryListEvent | MediaQueryList) => setIsMobile(e.matches);
+    update(mq);
+    const handler = (e: MediaQueryListEvent) => update(e);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobile) {
+      setIsSidebarOpen(true);
+    } else {
+      setIsSidebarOpen(false);
+    }
+  }, [isMobile]);
 
   const sortedMatches = useMemo(
     () =>
@@ -434,6 +453,14 @@ export default function LiveMatchesPage() {
       <div className="border-b bg-muted/30 px-3 py-2 flex-shrink-0">
         <div className="mx-auto max-w-[1800px] flex items-center justify-between">
           <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 px-2 text-xs lg:hidden"
+              onClick={() => setIsSidebarOpen((prev) => !prev)}
+            >
+              {isSidebarOpen ? "Kapat" : "Menü"}
+            </Button>
             <h1 className="text-2xl font-bold">Canlı Maçlar</h1>
             {isLoading && (
               <span
@@ -447,7 +474,7 @@ export default function LiveMatchesPage() {
           <div className="flex items-center gap-2">
             <Badge variant="secondary" className="gap-1.5 px-3 py-1 text-xs">
               <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
-              {matches.length} maç • Her 5 saniyede güncellenir
+              {matches.length} maç • {Math.round(POLL_MS / 1000)} saniyede bir
             </Badge>
             <Button
               variant="outline"
@@ -528,9 +555,19 @@ export default function LiveMatchesPage() {
       )}
 
       {/* Main Content - Flex Layout */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Match List Sidebar - Sticky */}
-        <div className="w-[280px] flex-shrink-0 border-r flex flex-col bg-background">
+      <div className="flex-1 flex overflow-hidden relative">
+        {isMobile && isSidebarOpen && (
+          <div
+            className="absolute inset-0 z-10 bg-black/40 lg:hidden"
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+        {/* Match List Sidebar - Sticky / Drawer */}
+        <div
+          className={`absolute lg:relative inset-y-0 left-0 z-20 w-[280px] flex-shrink-0 border-r flex flex-col bg-background transition-transform duration-200 ${
+            isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          }`}
+        >
           <div className="p-3 pb-2 border-b flex-shrink-0">
             <div className="flex items-center justify-between">
               <div className="text-sm font-semibold">Maçlar</div>
@@ -580,7 +617,10 @@ export default function LiveMatchesPage() {
                     key={match.id ?? Math.random()}
                     match={match}
                     active={String(selectedId) === String(match.id)}
-                    onSelect={() => setSelectedId(match.id ?? null)}
+                    onSelect={() => {
+                      setSelectedId(match.id ?? null);
+                      if (isMobile) setIsSidebarOpen(false);
+                    }}
                   />
                 ))}
               </div>
