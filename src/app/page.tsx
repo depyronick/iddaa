@@ -96,7 +96,9 @@ type MatchesResponse = {
 type FetchState = "idle" | "loading" | "error";
 type ViewMode = "live" | "prematch";
 
-const POLL_MS = 5000;
+const LIVE_POLL_MS = 5000;
+const PREMATCH_POLL_MS = 60000;
+const REQUEST_TIMEOUT_MS = 10000;
 
 function formatKickoff(kickoff?: number) {
   if (!kickoff) return "—";
@@ -345,11 +347,8 @@ export default function LiveMatchesPage() {
           const bMin = b.sc?.min ?? -1;
           return bMin - aMin;
         }
-        const aPop = (a.popularity ?? 0);
-        const bPop = (b.popularity ?? 0);
-        if (aPop !== bPop) return bPop - aPop;
-        const aKickoff = a.kickoff ?? (a as MatchEvent)?.d ?? Infinity;
-        const bKickoff = b.kickoff ?? (b as MatchEvent)?.d ?? Infinity;
+        const aKickoff = a.kickoff ?? (a as MatchEvent)?.d ?? 0;
+        const bKickoff = b.kickoff ?? (b as MatchEvent)?.d ?? 0;
         return aKickoff - bKickoff;
       }),
     [matches, viewMode]
@@ -415,10 +414,17 @@ export default function LiveMatchesPage() {
 
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
-    const controller = new AbortController();
-    controllerRef.current = controller;
+    let timeout: NodeJS.Timeout | null = null;
 
-    const fetchMatches = async () => {
+    const schedule = () => {
+      const delay = viewMode === "live" ? LIVE_POLL_MS : PREMATCH_POLL_MS;
+      timer = setTimeout(run, delay);
+    };
+
+    const run = async () => {
+      const controller = new AbortController();
+      controllerRef.current = controller;
+      timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
       try {
         setState("loading");
         const params = new URLSearchParams();
@@ -450,14 +456,18 @@ export default function LiveMatchesPage() {
         const message = err instanceof Error ? err.message : "Fetch failed";
         setError(message);
         setState("error");
+      } finally {
+        if (timeout) clearTimeout(timeout);
+        schedule();
       }
     };
 
-    fetchMatches();
-    timer = setInterval(fetchMatches, POLL_MS);
+    run();
+
     return () => {
-      if (timer) clearInterval(timer);
-      controller.abort();
+      if (timer) clearTimeout(timer);
+      if (timeout) clearTimeout(timeout);
+      controllerRef.current?.abort();
     };
   }, [viewMode]);
 
@@ -470,7 +480,7 @@ export default function LiveMatchesPage() {
   }
 
   return (
-    <div className="h-screen bg-background flex flex-col overflow-hidden">
+    <div className="h-dvh min-h-dvh bg-background flex flex-col overflow-hidden">
       {/* Header */}
       <div className="border-b bg-muted/30 px-3 py-2 flex-shrink-0">
         <div className="mx-auto max-w-[1800px] flex items-center justify-between">
@@ -517,7 +527,7 @@ export default function LiveMatchesPage() {
           <div className="flex items-center gap-2">
             <Badge variant="secondary" className="gap-1.5 px-3 py-1 text-xs">
               <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
-              {matches.length} maç • {Math.round(POLL_MS / 1000)}s
+              {matches.length} maç • {(viewMode === "live" ? LIVE_POLL_MS : PREMATCH_POLL_MS) / 1000}s
             </Badge>
             {viewMode === "prematch" && (
               <Button
@@ -708,7 +718,9 @@ export default function LiveMatchesPage() {
                       </div>
                       <div className="flex items-center gap-1.5">
                         <Badge variant="destructive" className="text-[10px] px-1.5 py-0.5 font-semibold">
-                          {statusLabel(selectedMatch.sc?.s ?? selectedMatch.status)}
+                          {selectedMatch.status === 0
+                            ? formatKickoffTime(selectedMatch.kickoff ?? (selectedMatch as MatchEvent)?.d)
+                            : statusLabel(selectedMatch.sc?.s ?? selectedMatch.status)}
                         </Badge>
                         {selectedMatch.sc?.min && selectedMatch.sc.min > 0 && (
                           <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 font-semibold">
@@ -1262,6 +1274,53 @@ export default function LiveMatchesPage() {
                     {match.markets.length > 0 && (
                       <>
                         <Separator className="my-1.5" />
+                        {viewMode === "prematch" && selectedMatch && (() => {
+                          const matchPerc = selectedMatch.playPercentages || {};
+                          const rows: Array<{ pct: number; market: string; outcome: string }> = [];
+                          selectedMatch.markets.forEach((market) => {
+                            const marketId = market.id !== undefined ? String(market.id) : undefined;
+                            if (!marketId) return;
+                            const outcomePerc = matchPerc[marketId] || {};
+                            market.outcomes.forEach((outcome) => {
+                              const oid = outcome.id ?? outcome.on ?? outcome.no ?? outcome.No;
+                              const oidStr = oid !== undefined ? String(oid) : undefined;
+                              if (!oidStr) return;
+                              const pct = outcomePerc[oidStr];
+                              if (pct === undefined || pct === null || pct <= 0) return;
+                              rows.push({
+                                pct,
+                                market: formatMarketLabel(market),
+                                outcome: outcome.name || outcome.value?.toString() || oidStr,
+                              });
+                            });
+                          });
+                          const topForSelected = rows.sort((a, b) => b.pct - a.pct).slice(0, 10);
+                          if (topForSelected.length === 0) return null;
+                          return (
+                            <details className="group mb-1 rounded border border-border bg-muted/30" open>
+                              <summary className="cursor-pointer list-none px-2 py-1.5 flex items-center justify-between">
+                                <span className="text-xs font-semibold">En Çok Tercih Edilen 10 Bahis</span>
+                                <span className="text-xs text-muted-foreground transition-transform group-open:rotate-180">▼</span>
+                              </summary>
+                              <div className="px-2 pb-2">
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-1">
+                                  {topForSelected.map((row, idx) => (
+                                    <div key={`${row.market}-${row.outcome}-${idx}`} className="flex items-center gap-2 rounded border border-border px-2 py-1">
+                                      <div className="w-10 text-right text-[11px] font-semibold text-primary">{row.pct}%</div>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="text-[11px] font-semibold truncate">{row.market}</div>
+                                        <div className="text-[10px] text-muted-foreground truncate">{row.outcome}</div>
+                                      </div>
+                                      <div className="w-16">
+                                        <Progress value={row.pct} className="h-1" />
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </details>
+                          );
+                        })()}
                         <details className="group" open>
                           <summary className="cursor-pointer list-none">
                             <div className="flex items-center justify-between py-1.5 px-2 rounded bg-muted/50 hover:bg-muted transition-colors">
