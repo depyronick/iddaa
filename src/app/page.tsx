@@ -476,18 +476,18 @@ export default function LiveMatchesPage() {
             </Button>
             <h1 className="text-2xl font-bold">Canlı Maçlar</h1>
             {isLoading && (
-              <span
-                className="h-4 w-4 rounded-full border-2 border-primary border-t-transparent animate-spin"
+              <div
+                className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-primary/70 border-t-transparent align-middle"
                 aria-label="Yükleniyor"
               >
                 <span className="sr-only">Yükleniyor</span>
-              </span>
+              </div>
             )}
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="secondary" className="gap-1.5 px-3 py-1 text-xs">
               <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
-              {matches.length} maç • {Math.round(POLL_MS / 1000)} saniyede bir
+              {matches.length} maç • {Math.round(POLL_MS / 1000)}s
             </Badge>
             <Button
               variant="outline"
